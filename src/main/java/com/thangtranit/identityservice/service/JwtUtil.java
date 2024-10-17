@@ -1,10 +1,7 @@
 package com.thangtranit.identityservice.service;
 
-import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.MACSigner;
-import com.nimbusds.jose.crypto.MACVerifier;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -18,7 +15,7 @@ import com.thangtranit.identityservice.exception.AppException;
 import com.thangtranit.identityservice.exception.ErrorCode;
 import com.thangtranit.identityservice.repository.LoggedOutTokenRepository;
 
-import java.text.ParseException;
+import java.security.Key;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -39,6 +36,10 @@ public class JwtUtil {
 
     private final LoggedOutTokenRepository loggedOutTokenRepository;
 
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(secretKey.getBytes());
+    }
+
     public String generateToken(User user, boolean isRefreshToken, String jit) {
         return createJwtToken(user, isRefreshToken, jit);
     }
@@ -48,80 +49,48 @@ public class JwtUtil {
     }
 
     private String createJwtToken(User user, boolean isRefreshToken, String jit) {
-        try {
-            JWTClaimsSet jwtClaimsSet = buildJwtClaimsSet(user, isRefreshToken, jit);
-            JWSObject jwsObject = new JWSObject(new JWSHeader(JWSAlgorithm.HS512), new Payload(jwtClaimsSet.toJSONObject()));
-            jwsObject.sign(new MACSigner(secretKey.getBytes()));
-            return jwsObject.serialize();
-        } catch (JOSEException e) {
-            throw new RuntimeException("Error signing the token", e);
-        }
-    }
-
-    private JWTClaimsSet buildJwtClaimsSet(User user, boolean isRefreshToken, String jit) {
         int duration = !isRefreshToken ? accessTokenDuration : refreshTokenDuration;
         ChronoUnit unit = !isRefreshToken ? ChronoUnit.MINUTES : ChronoUnit.DAYS;
-        JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder()
-                .issuer("stu-e-learning")
-                .subject(String.valueOf(user.getId()))
-                .issueTime(new Date())
-                .expirationTime(Date.from(Instant.now().plus(duration, unit)))
-                .jwtID(jit)
+
+        Instant now = Instant.now();
+
+        return Jwts.builder()
+                .setIssuer("stu-e-learning")
+                .setSubject(String.valueOf(user.getId()))
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(now.plus(duration, unit)))
+                .setId(jit)
                 .claim("scope", user.getRoles())
-                .claim("type", isRefreshToken ? "refresh-token" : "access-token");
-
-        return builder.build();
+                .claim("type", isRefreshToken ? "refresh-token" : "access-token")
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .compact();
     }
 
-    public SignedJWT verifyToken(String token) {
+    public Claims verifyToken(String token) {
         try {
-            SignedJWT signedJWT = SignedJWT.parse(token);
-            if (isTokenExpiredOrInvalid(signedJWT) || isTokenLoggedOut(signedJWT)) {
-                throw new AppException(ErrorCode.TOKEN_IS_EXPIRED_OR_INVALID);
-            }
-            return signedJWT;
-        } catch (Exception e) {
+            return Jwts.parser()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (JwtException e) {
             throw new AppException(ErrorCode.TOKEN_IS_EXPIRED_OR_INVALID);
         }
-    }
-
-    private boolean isTokenExpiredOrInvalid(SignedJWT signedJWT) {
-        try {
-            JWSVerifier verifier = new MACVerifier(secretKey.getBytes());
-            Date expiryDate = signedJWT.getJWTClaimsSet().getExpirationTime();
-            return !(signedJWT.verify(verifier) && expiryDate.after(new Date()));
-        } catch (Exception e) {
-            throw new AppException(ErrorCode.TOKEN_IS_EXPIRED_OR_INVALID);
-        }
-    }
-
-    private boolean isTokenLoggedOut(SignedJWT signedJWT) throws java.text.ParseException {
-        return loggedOutTokenRepository.existsById(signedJWT.getJWTClaimsSet().getJWTID());
     }
 
     public String getSub(String token) {
-        SignedJWT signedJWT = verifyToken(token);
-        try {
-            return signedJWT.getJWTClaimsSet().getSubject();
-        } catch (Exception e) {
-            throw new AppException(ErrorCode.TOKEN_IS_EXPIRED_OR_INVALID);
-        }
+        Claims claims = verifyToken(token);
+        return claims.getSubject();
     }
 
-
     public String getJit(String token) {
-        SignedJWT signedJWT = verifyToken(token);
-        try {
-            return signedJWT.getJWTClaimsSet().getJWTID();
-        } catch (Exception e) {
-            throw new AppException(ErrorCode.TOKEN_IS_EXPIRED_OR_INVALID);
-        }
+        Claims claims = verifyToken(token);
+        return claims.getId();
     }
 
     public String getCurrentUserId() {
         return getJwt().getSubject();
     }
-
 
     private Jwt getJwt() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -139,18 +108,14 @@ public class JwtUtil {
     }
 
     public boolean isRefreshToken(String token) {
-        try {
-            SignedJWT signedJWT = verifyToken(token);
-            return signedJWT.getJWTClaimsSet().getClaim("type").equals("refresh-token");
-        } catch (ParseException e) {
-            throw new AppException(ErrorCode.TOKEN_IS_EXPIRED_OR_INVALID);
-        }
+        Claims claims = verifyToken(token);
+        return "refresh-token".equals(claims.get("type"));
     }
 
-    public void logoutToken(String token) throws ParseException {
-        SignedJWT signedJWT = verifyToken(token);
-        String jit = signedJWT.getJWTClaimsSet().getJWTID();
-        Date expiryTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+    public void logoutToken(String token) {
+        Claims claims = verifyToken(token);
+        String jit = claims.getId();
+        Date expiryTime = claims.getExpiration();
 
         LoggedOutToken loggedOutToken = LoggedOutToken.builder()
                 .id(jit)

@@ -98,17 +98,13 @@ public class AuthenticationService {
 
     @PreAuthorize("@jwtUtil.getCurrentUserId() == @jwtUtil.getSub(#refreshToken)")
     public void logout(String refreshToken, HttpServletResponse response) {
-        try {
             jwtUtil.logoutToken(refreshToken);
             Cookie refreshTokenCookie = new Cookie("refreshToken", "");
             refreshTokenCookie.setHttpOnly(true); // Đảm bảo HttpOnly để bảo mật
-            refreshTokenCookie.setSecure(false);   // Chỉ gửi qua HTTPS
+            refreshTokenCookie.setSecure(false);
             refreshTokenCookie.setPath("/");
             refreshTokenCookie.setMaxAge(0);
             response.addCookie(refreshTokenCookie);
-        } catch (ParseException e) {
-            throw new AppException(ErrorCode.TOKEN_IS_EXPIRED_OR_INVALID);
-        }
     }
 
 
