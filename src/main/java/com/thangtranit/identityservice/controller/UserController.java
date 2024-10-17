@@ -6,7 +6,6 @@ import com.thangtranit.identityservice.dto.request.OtpVerifyRequest;
 import com.thangtranit.identityservice.dto.response.ApiResponse;
 import com.thangtranit.identityservice.dto.response.ChangeEmailResponse;
 import com.thangtranit.identityservice.dto.response.OtpVerifyResponse;
-import com.thangtranit.identityservice.dto.response.UserProfileResponse;
 import com.thangtranit.identityservice.service.UserService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -20,20 +19,6 @@ import org.springframework.web.bind.annotation.*;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserController {
     final UserService userService;
-
-    @GetMapping("/{id}")
-    ApiResponse<UserProfileResponse> getUserProfile(@PathVariable String id) {
-        return ApiResponse.<UserProfileResponse>builder()
-                .body(userService.getProfile(id))
-                .build();
-    }
-
-    @GetMapping("/profile")
-    ApiResponse<UserProfileResponse> getProfile(){
-        return ApiResponse.<UserProfileResponse>builder()
-                .body(userService.getProfile())
-                .build();
-    }
 
     @GetMapping({"/update/email", "/update/password"})
     ApiResponse<Void> prepareForChangeLoginInfo() {

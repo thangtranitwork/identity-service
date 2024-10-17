@@ -6,7 +6,6 @@ import com.thangtranit.identityservice.dto.request.OtpVerifyRequest;
 import com.thangtranit.identityservice.dto.response.ChangeEmailResponse;
 import com.thangtranit.identityservice.dto.response.OtpVerifyResponse;
 import com.thangtranit.identityservice.dto.response.UserAdminViewResponse;
-import com.thangtranit.identityservice.dto.response.UserProfileResponse;
 import com.thangtranit.identityservice.entity.Platform;
 import com.thangtranit.identityservice.entity.Role;
 import com.thangtranit.identityservice.entity.User;
@@ -15,7 +14,6 @@ import com.thangtranit.identityservice.exception.ErrorCode;
 import com.thangtranit.identityservice.mapper.UserMapper;
 import com.thangtranit.identityservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.NonFinal;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -34,22 +32,8 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final RegisterService registerService;
     private final JwtUtil jwtUtil;
-    @NonFinal
-    private final int pageSize = 10;
 
-    public UserProfileResponse getProfile(String id) {
-        User user = userRepository.findById(id).orElseThrow(
-                () -> new AppException(ErrorCode.USER_NOT_EXISTS));
-        return userMapper.toUserProfileResponse(user);
-    }
-
-    public UserProfileResponse getProfile() {
-        User user = userRepository.findById(getCurrentUserId()).orElseThrow(
-                () -> new AppException(ErrorCode.USER_NOT_EXISTS));
-        return userMapper.toUserProfileResponse(user);
-    }
-
-    public User getUser(String id) {
+    private User getUser(String id) {
         return userRepository.findById(id).orElseThrow(
                 () -> new AppException(ErrorCode.USER_NOT_EXISTS));
     }

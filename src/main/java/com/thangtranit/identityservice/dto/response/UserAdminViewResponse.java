@@ -10,12 +10,6 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserAdminViewResponse {
     String id;
-    @Builder.Default
-    String lastname = "";
-    @Builder.Default
-    String firstname = "";
-    @Builder.Default
-    String avatar = "";
-    @Builder.Default
-    String roles = "";
+    String email;
+    String roles;
 }
