@@ -102,7 +102,6 @@ public class AuthenticationService {
             jwtUtil.logoutToken(refreshToken);
             Cookie refreshTokenCookie = new Cookie("refreshToken", "");
             refreshTokenCookie.setHttpOnly(true); // Đảm bảo HttpOnly để bảo mật
-            //TODO: change it to true when use https
             refreshTokenCookie.setSecure(false);   // Chỉ gửi qua HTTPS
             refreshTokenCookie.setPath("/");
             refreshTokenCookie.setMaxAge(0);
